@@ -1,0 +1,14 @@
+# ---- Continuum backend ----
+fastapi>=0.111
+uvicorn[standard]>=0.30
+pydantic>=2.7
+pydantic-settings>=2.3
+python-dotenv>=1.0
+groq>=0.11            # Groq LLM (real-time reasoning + extraction)
+httpx>=0.27
+
+# ---- The memory layer (the heart of the project) ----
+# Cognee powers the hybrid graph+vector memory, temporal cognification,
+# cross-session recall and the four operations (remember/recall/improve/forget).
+# Heavy install; the app degrades gracefully if it is not yet configured.
+cognee>=0.1.30
