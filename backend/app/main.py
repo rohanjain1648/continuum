@@ -20,7 +20,11 @@ log = logging.getLogger("continuum")
 
 app = FastAPI(title="Continuum", version="0.1.0")
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:8000", "https://*.vercel.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 ws_manager = WSManager()
