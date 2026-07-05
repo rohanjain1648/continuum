@@ -1,12 +1,26 @@
-# Continuum Deployment Guide
+# Continuum Deployment Guide — Render
 
-## Quick Deploy (Vercel + Railway) — 10 minutes
+One Render Web Service hosts the whole app: FastAPI serves the REST API, the
+`/ws` WebSocket, *and* the built React frontend from the same origin
+(`main.py`'s SPA fallback already does this). There's no separate frontend
+deployment to wire up — a Docker build compiles the Vite frontend and bundles
+it straight into the backend image.
 
-### Prerequisites
-- GitHub account (free)
-- Vercel account (free, linked to GitHub)
-- Railway account (free)
-- GROQ API key (get at https://console.groq.com)
+> **Why not the old Vercel + Railway split?** An earlier version of this repo
+> was configured for a two-service split (frontend on Vercel, backend on
+> Railway, connected via a `VITE_API_URL` env var). That variable was never
+> actually read anywhere in the frontend code — every fetch and WebSocket
+> connection uses same-origin relative paths (`/api/...`, `${location.host}/ws`).
+> So the split never really worked as documented. Render's single-service
+> model is what the app is actually built for.
+
+## Prerequisites
+- GitHub account, with this repo pushed to it
+- [Render account](https://render.com) (free tier works for a demo)
+- A [Groq API key](https://console.groq.com) (optional — the app runs in
+  heuristic mode without one, but a real key makes the demo look better)
+- Optional: [Cognee Cloud](https://platform.cognee.ai/onboarding) credentials
+  — recommended on Render, see the disk-persistence note below
 
 ---
 
@@ -19,150 +33,122 @@ git branch -M main
 git push -u origin main
 ```
 
-**Replace `YOUR_GITHUB_USERNAME` with your actual GitHub username.**
+---
+
+## Step 2: Deploy on Render
+
+### Option A — Blueprint (one click, uses `render.yaml`)
+
+1. Render dashboard → **New** → **Blueprint**
+2. Connect the GitHub repo — Render finds `render.yaml` automatically and
+   provisions a Docker web service named `continuum`
+3. Render will prompt you to fill in the `sync: false` secrets:
+   `GROQ_API_KEY`, and optionally `COGNEE_API_KEY` / `COGNEE_BASE_URL`
+4. Click **Apply** — Render builds the Docker image and deploys
+
+### Option B — Manual web service
+
+1. Render dashboard → **New** → **Web Service** → connect the repo
+2. **Runtime:** Docker (Render auto-detects the root `Dockerfile`)
+3. **Health check path:** `/healthz`
+4. Add environment variables (see below), then **Create Web Service**
+
+Either way, the first build takes a few minutes (Node stage builds the
+frontend, Python stage installs `requirements.txt` — `cognee` is a heavy
+package). Render shows live build logs.
 
 ---
 
-## Step 2: Deploy Frontend on Vercel
+## Environment variables
 
-1. Go to **https://vercel.com/import**
-2. Select "Import Git Repository"
-3. Paste your GitHub repo URL: `https://github.com/YOUR_GITHUB_USERNAME/continuum`
-4. Click "Continue"
-5. **Framework Preset:** select "Vite"
-6. **Build Command:** `cd frontend && npm install && npm run build`
-7. **Output Directory:** `frontend/dist`
-8. **Environment Variables:** Add this key:
-   - `VITE_API_URL` = `https://continuum-api.railway.app` (you'll update this after deploying the backend)
-9. Click "Deploy"
+| Variable | Required? | Notes |
+|---|---|---|
+| `GROQ_API_KEY` | Recommended | Without it, extraction/contradiction-detection falls back to deterministic heuristics — the demo still runs, just less impressively. |
+| `GROQ_MODEL` | No | Defaults to `llama-3.3-70b-versatile` |
+| `GROQ_FAST_MODEL` | No | Defaults to `llama-3.1-8b-instant` |
+| `USE_COGNEE` | No | Defaults to `true` |
+| `COGNEE_DATASET` | No | Defaults to `continuum` |
+| `COGNIFY_EVERY` | No | Defaults to `4` |
+| `COGNEE_API_KEY` / `COGNEE_BASE_URL` | Recommended on Render | Routes Cognee to a hosted Cognee Cloud tenant instead of local disk — see below. |
+| `HOST` | No | Defaults to `0.0.0.0` — leave as-is |
+| `PORT` | Don't set | Render injects this itself; `run.py` already reads it via `config.py`. |
 
-✅ Your frontend is now live at: `https://continuum-YOUR_PROJECT_NAME.vercel.app`
+`render.yaml` declares all of these; `sync: false` ones need a value typed
+into the Render dashboard (Environment tab) since secrets aren't stored in
+the blueprint file.
 
----
+### Why Cognee Cloud matters here specifically
 
-## Step 3: Deploy Backend on Railway
-
-1. Go to **https://railway.app** and sign in with GitHub
-2. Click **"New Project"** → **"Deploy from GitHub repo"**
-3. Select your `continuum` repository
-4. Railway auto-detects Python. Configure:
-   - **Start Command:** `python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT` (or uses Procfile)
-   - **Working Directory:** `backend` (optional, if not auto-detected)
-5. Add **Environment Variables** in the Railway dashboard:
-   - `GROQ_API_KEY` = your actual Groq API key
-   - `USE_COGNEE` = `false` (for now, optional)
-   - `HOST` = `0.0.0.0`
-   - `PORT` = `$PORT` (Railway sets this automatically)
-6. Click "Deploy"
-
-✅ Backend is live at: `https://continuum-api.railway.app` (Railway assigns a domain automatically)
+Render's free/standard web services have an **ephemeral filesystem** — every
+redeploy (and some restarts) wipes it. Cognee's local default (SQLite +
+LanceDB) writes to that disk, so without Cognee Cloud, memory resets on every
+deploy. Setting `COGNEE_API_KEY` / `COGNEE_BASE_URL` routes `remember()` /
+`recall()` / `improve()` / `forget()` at a hosted Cognee tenant instead, which
+survives redeploys independently of the container. If you leave both blank,
+the app still works fine for a single demo session — it just won't remember
+across a redeploy.
 
 ---
 
-## Step 4: Connect Frontend to Backend
+## Testing your deployment
 
-1. Go back to your **Vercel project settings**
-2. Navigate to **Environment Variables**
-3. Update `VITE_API_URL` = `https://continuum-api.railway.app`
-4. Trigger a redeploy: Click "Deployments" → select latest → "Redeploy"
+```bash
+curl https://<your-service>.onrender.com/healthz
+# {"ok": true, "groq": true}
+```
 
----
-
-## Step 5: Update CORS in Backend (if needed)
-
-If you see CORS errors in the browser console:
-
-1. Go to your Railway project
-2. Edit `ALLOWED_ORIGINS` environment variable:
-   ```
-   http://localhost:5173,http://localhost:8000,https://continuum-YOUR_PROJECT_NAME.vercel.app
-   ```
-3. Redeploy the backend
+Then open `https://<your-service>.onrender.com` in a browser → **Launch the
+Studio** → **▶ Play demo negotiation**. You should see the live transcript,
+the $40k → $55k contradiction flag mid-script, and the 3D graph updating in
+real time — all served from the one Render URL.
 
 ---
 
-## What's Deployed?
+## Common issues
 
-| Component | Platform | URL |
-|-----------|----------|-----|
-| Frontend (React + Vite) | Vercel | `https://continuum-*.vercel.app` |
-| Backend (FastAPI) | Railway | `https://continuum-api.railway.app` |
-| Database | Local (Cognee) | N/A |
-| LLM | Groq | (Remote, via API key) |
+**Cold start / first request is slow**
+Render's free tier spins services down after inactivity; the first request
+after idle can take 30–60s to wake it back up. Expected on the free plan, not
+a bug.
 
----
+**WebSocket not connecting**
+Render terminates TLS and proxies WebSocket upgrades automatically — the
+frontend's `wss://` connection (from `useContinuum.js`, based on
+`location.protocol`) should just work over HTTPS. If it doesn't, check the
+service is actually on the `web` type (not `worker`) and that nothing
+upstream (a custom proxy/CDN) is stripping the `Upgrade` header.
 
-## Testing Your Deployment
+**"GROQ API key not found" / running in heuristic mode**
+Set `GROQ_API_KEY` in the Render dashboard's Environment tab, then trigger a
+manual redeploy (env var changes don't hot-reload).
 
-1. Open your Vercel frontend URL
-2. Click **"Launch Studio"**
-3. Click **"▶ Play demo"** to test the full pipeline
-4. You should see:
-   - Live transcript with speaker names
-   - Real-time contradiction detection ($40k → $55k conflict)
-   - Live 3D knowledge graph updates
-   - Stats updating in real-time
-
----
-
-## Common Issues
-
-### "Cannot connect to backend"
-- Check Railway backend is running: visit `https://continuum-api.railway.app/healthz`
-- Verify `VITE_API_URL` is set correctly in Vercel
-- Check CORS: add your Vercel domain to Railway environment variables
-
-### "GROQ API key not found"
-- Make sure `GROQ_API_KEY` is set in Railway environment variables
-- Verify the key is valid at https://console.groq.com
-
-### "Cognee errors"
-- Set `USE_COGNEE=false` in Railway env vars (app runs in heuristic mode)
-- Or install Cognee: `pip install cognee` in Railway
+**Cognee errors, or memory resets after every deploy**
+Either set `COGNEE_API_KEY` / `COGNEE_BASE_URL` (see above), or set
+`USE_COGNEE=false` to run purely on the Groq + in-memory fact ledger path —
+the live contradiction detection still works either way.
 
 ---
 
-## Monitoring & Logs
+## Monitoring & logs
 
-**Vercel Logs:**
-- Dashboard → Deployments → View logs
+Render dashboard → your service → **Logs** tab (live streaming) and
+**Metrics** tab (CPU/memory/request graphs).
 
-**Railway Logs:**
-- Dashboard → Logs tab (real-time streaming)
+## Custom domain
 
----
-
-## Next Steps (Optional)
-
-### Add a Custom Domain
-- **Vercel:** Domains → Add → Connect your domain
-- **Railway:** Connect domain in project settings
-
-### Enable Analytics
-- Vercel: Automatic (see in Analytics tab)
-- Railway: View in "Monitoring" tab
-
-### CI/CD Pipeline
-- Both platforms auto-deploy on git push to `main`
-- No additional setup needed!
-
----
+Render dashboard → your service → **Settings** → **Custom Domains**.
 
 ## Rollback
 
-To rollback to a previous version:
-
-**Vercel:** Deployments → click any deployment → "Promote to Production"
-**Railway:** Deployments → select version → "Redeploy"
+Render dashboard → your service → **Events**/**Deploys** tab → pick a
+previous successful deploy → **Rollback to this deploy**.
 
 ---
 
-## Support
+## Local Docker build (optional, to test before pushing)
 
-- **Vercel Docs:** https://vercel.com/docs
-- **Railway Docs:** https://docs.railway.app
-- **Groq Docs:** https://console.groq.com/docs
-
----
-
-**🚀 You're live!** Share your Vercel URL with the judges.
+```bash
+docker build -t continuum .
+docker run -p 8000:8000 --env-file backend/.env continuum
+```
+Open `http://localhost:8000` — same image Render will build from.

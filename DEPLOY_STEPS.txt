@@ -1,0 +1,59 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                    CONTINUUM DEPLOYMENT QUICK START (RENDER)               ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+✅ DONE:
+  • Multi-stage Dockerfile (Node build → Python runtime, one image)
+  • render.yaml Blueprint — single Web Service, no separate frontend host
+  • .dockerignore, DEPLOYMENT.md updated for Render
+  • Local git repo tracked, connected to origin/main
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 NEXT STEPS:
+
+╭─ 1. PUSH TO GITHUB (if not already) ───────────────────────────────────────╮
+│                                                                             │
+│    cd d:\downloads\cognee\continuum                                        │
+│    git remote add origin https://github.com/YOUR_USERNAME/continuum        │
+│    git branch -M main                                                      │
+│    git push -u origin main                                                 │
+│                                                                             │
+╰─────────────────────────────────────────────────────────────────────────── ╯
+
+╭─ 2. DEPLOY ON RENDER (Blueprint — one click) ──────────────────────────────╮
+│                                                                             │
+│    • Render dashboard → New → Blueprint                                   │
+│    • Connect the continuum GitHub repo                                    │
+│    • Render reads render.yaml automatically → provisions the service      │
+│    • Fill in the prompted secrets:                                        │
+│        GROQ_API_KEY           (get one free at console.groq.com)          │
+│        COGNEE_API_KEY / COGNEE_BASE_URL   (optional — see note below)     │
+│    • Click Apply → Render builds the Docker image and deploys             │
+│                                                                             │
+╰─────────────────────────────────────────────────────────────────────────── ╯
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  ONE THING WORTH KNOWING:
+   Render's free/standard web services have an EPHEMERAL filesystem — it
+   resets on every redeploy. Cognee's local default (SQLite + LanceDB)
+   writes to that disk. Set COGNEE_API_KEY + COGNEE_BASE_URL (from
+   https://platform.cognee.ai/onboarding) to route memory to a hosted
+   Cognee Cloud tenant instead, so it survives redeploys. Optional for a
+   one-off demo; recommended for anything longer-lived.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📖 DETAILED GUIDE:
+   See DEPLOYMENT.md for the full walkthrough, troubleshooting, rollback,
+   and how to test the deployed build locally with Docker first.
+
+⏱️  TOTAL TIME: ~10 minutes from GitHub to live (first Docker build is the
+   slowest step — cognee is a heavy install).
+
+🎯 FINAL RESULT:
+   One URL: https://continuum.onrender.com (or your service's Render
+   domain) — API, WebSocket, and the full Studio UI, all from it.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -261,14 +261,17 @@ Click "🙈 Off the record · forget()" to redact the last statement:
 ┌──────────────────────────────────────────────────────────────────────┐
 │  Cognee (Memory Layer)                                              │
 │  ┌──────────────────────────────────────────────────────────────┐   │
-│  │ Graph DB (Postgres default)   Vector DB (pgvector default)   │   │
-│  │ • entities (speakers, topics) • embeddings (semantic)        │   │
-│  │ • facts (utterances)          • HNSW search                  │   │
-│  │ • events (with timestamps)    • cosine similarity            │   │
-│  │ • relationships (before/after) • recall() routes here        │   │
+│  │ Relational store (local SQLite)  Vector store (local LanceDB)│   │
+│  │ • entities (speakers, topics)    • embeddings (fastembed,    │   │
+│  │ • facts (utterances)               all-MiniLM-L6-v2, 384-dim)│   │
+│  │ • events (with timestamps)       • recall() routes here      │   │
+│  │ • relationships (before/after)                                │   │
 │  │ • contradictions (edges)                                     │   │
+│  │ Graph provider: Kuzu (optional, via GRAPH_DATABASE_PROVIDER) │   │
 │  └──────────────────────────────────────────────────────────────┘   │
-│  Session Cache (Redis or Postgres): fast ingest path              │   │
+│  No external DB/cache to provision — everything above is local to  │   │
+│  the Cognee process. Live session state (transcript, fact ledger)  │   │
+│  lives in ContinuumEngine, in-process, separate from Cognee.       │   │
 └──────────────────────────────────────────────────────────────────────┘
                                   ↓
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -307,6 +310,13 @@ Check: same subject in priors?
 ---
 
 ## Workflow — The 16-State FSM
+
+*This is a conceptual model of Continuum's behavior for design purposes —
+there is no literal `FSM`/state-machine class in the code. The real
+implementation is the five-step async pipeline in `ContinuumEngine.ingest()`
+described under [Architecture](#architecture) above; the states below just
+make its branches and background tasks (like batched `cognify()`) easier to
+reason about as a whole.*
 
 Continuum's behavior can be modeled as a finite state machine with 16 key states:
 
@@ -410,10 +420,13 @@ All transitions are **async** and **non-blocking**; the hot path (ingest + extra
 | **3D Utilities** | @react-three/drei 9 | Prebuilt: OrbitControls, Stars, Billboard, Line |
 | **Layout** | d3-force-3d 3 | Force simulation for knowledge graph |
 | **Animation** | Framer Motion 11 | Stagger, fade, scale transitions |
-| **Styling** | CSS (custom, Tailwind CDN) | Dark glassmorphism design |
-| **Fonts** | Google Fonts | Inter (body), JetBrains Mono (code), Space Grotesk (display) |
+| **Styling** | Hand-written CSS, custom properties | Dark glassmorphism design, no framework |
+| **Fonts** | Google Fonts (`index.html`) | Inter (body), JetBrains Mono (code), Space Grotesk (display) |
 
-**Bundle size:** ~1.3 MB (gzipped: ~383 KB). Three.js is heavy but necessary for 3D.
+**Bundle size:** `npm run build` currently emits ~1.28 MB uncompressed
+(`index-*.js` ~1.24 MB + `index-*.css` ~14 KB) — measured directly from
+`frontend/dist/assets`. Three.js accounts for most of it; not yet
+code-split or lazy-loaded.
 
 ### Backend (FastAPI + Python)
 | Layer | Technology | Why |
@@ -430,10 +443,11 @@ All transitions are **async** and **non-blocking**; the hot path (ingest + extra
 |-------|-----------|-----|
 | **LLM** | **Groq** (llama-3.3-70b, 3.1-8b) | Fast inference, real-time reasoning, no rate-limit for hackathon |
 | **Memory** | **Cognee** | Hybrid graph + vector, temporal cognification, four ops (remember/recall/improve/forget) |
-| **Graph DB** | Postgres (default) | Self-hosted, open-source, pgvector plugin for embeddings |
-| **Vector DB** | pgvector (default) | In Postgres; local embedding (fastembed), no external key needed |
+| **Relational store** | SQLite (Cognee default) | Local, zero-config, no server to run |
+| **Vector store** | LanceDB (Cognee default) | Local, embedded, no external key needed |
+| **Graph provider** | Kuzu (optional, `GRAPH_DATABASE_PROVIDER`) | Not required to run — falls back to Cognee's default if unset |
 | **Embedding Model** | sentence-transformers/all-MiniLM-L6-v2 | 384-dim, local (fastembed), works offline |
-| **Session Cache** | Redis or Postgres | Fast ingest path for live utterances |
+| **Session state** | In-process (`ContinuumEngine`) | Live transcript/facts/archive live in the FastAPI process; no cache layer today |
 
 ### DevOps
 | Layer | Technology | Why |
@@ -535,14 +549,25 @@ Result: **the entire app works end-to-end without a Groq key** (degraded quality
 
 ## Impact
 
-### Quantified Outcomes (Hackathon Demo)
+### What the demo actually shows
 
-In a **scripted 10-utterance negotiation:**
-- **Time to detect contradiction:** <1 sec (the moment it's said).
-- **Facts extracted:** 11.
-- **Contradictions surfaced:** 2 (the budget reversal, and an "off the record" mention).
-- **Graph nodes:** 21 (4 speakers, 3 subjects, 14 facts).
-- **User perception:** "It caught the thing I almost missed."
+The scripted negotiation in
+[demo_script.py](backend/app/demo_script.py) is 11 lines. Playing it end to
+end (`▶ Play demo negotiation`) reliably produces:
+- **One clear contradiction**, flagged the instant the ninth line is
+  ingested: budget "firm at $40,000" (t0) vs. "up to $55,000" (t8) — visible
+  as a toast, a contradiction card, and a coral-glowing dashed edge in the
+  3D graph within the same broadcast cycle, well under a second after the
+  line is sent.
+- **One "off the record" line** available to demonstrate `forget()` live —
+  the node disappears from the graph on click.
+- A handful of `commitment`/`decision`/`number`/`risk` facts extracted
+  along the way, exact counts depending on the extraction model in use
+  (Groq vs. heuristic fallback) — not a fixed number worth over-claiming
+  precision on.
+
+These are the two moments the demo is built to hit, not a benchmark suite;
+we haven't run this against real, unscripted calls yet.
 
 ### Beyond the Demo
 
@@ -655,21 +680,27 @@ In a **scripted 10-utterance negotiation:**
 
 ### Scaling Assumptions
 
-**Single-box (MVP):**
-- PostgreSQL (graph + pgvector + session cache)
-- Cognee on the same machine
-- Groq API (remote, no scaling needed)
-- Flask/Uvicorn on a single process
-- **Throughput:** ~50 concurrent calls, 10 utterances/sec per call.
+**Single-box (current state):**
+- Cognee's default local stores (SQLite + LanceDB) on the same machine as
+  the FastAPI process — this is what actually ships today, not a future plan.
+- `ContinuumEngine` holds live session state (transcript, fact ledger,
+  archive) in-process — a restart clears the live call.
+- Groq API (remote, no scaling needed on our side).
+- Uvicorn on a single process; `WSManager` broadcasts to whatever's
+  connected to *that* process.
+- Realistic ceiling before something below needs to change: a handful of
+  concurrent calls sharing one process — untested beyond the demo script.
 
-**Multi-box (1K concurrent calls):**
-- PostgreSQL → read replicas + connection pooling (pgbouncer)
-- Cognee (graph DB) → sharded by dataset_id
-- Vector DB → separate instance (Weaviate, Qdrant, or managed pgvector)
-- Groq → rate-limit at 30 calls/sec; queue excess with Celery/RQ
-- Uvicorn → 4 worker processes, load-balanced (nginx)
-- Redis → session cache (fast ingest)
-- WebSocket → sticky sessions or Redis pub/sub (for multi-server broadcasts)
+**Multi-box (proposed, not built):** the shape a production version would
+need for ~1K concurrent calls —
+- Swap Cognee's local stores for a managed Postgres+pgvector or a dedicated
+  vector DB (Weaviate/Qdrant), sharded by `dataset_id`.
+- Move live session state out of process into Redis or Postgres, so any
+  worker can serve any session.
+- Groq → rate-limit-aware queueing (Celery/RQ) once past its free-tier ceiling.
+- Uvicorn → multiple worker processes behind nginx/a load balancer.
+- WebSocket → sticky sessions or a pub/sub fan-out (Redis) so a broadcast
+  reaches clients connected to a *different* worker.
 
 **Bottlenecks & mitigations:**
 
@@ -707,9 +738,10 @@ Currently: **none** (demo). For production:
 - IP whitelisting (for B2B deployments).
 
 #### 2. **Data Encryption**
-- **In transit:** TLS 1.3 (HTTPS + WSS).
-- **At rest:** Postgres can use encrypted tablespaces.
-- **Secrets:** Store in `.env` (version-controlled), use secrets manager (Vault, AWS Secrets) in prod.
+Currently: plain HTTP/WS locally, `.env` (git-ignored) for secrets. For production:
+- **In transit:** put it behind TLS (HTTPS + WSS) — the platform (Render/nginx) typically handles this, Continuum itself doesn't terminate TLS.
+- **At rest:** if you swap Cognee's local SQLite/LanceDB for a managed Postgres store (see [Scalability](#scalability)), enable encryption there.
+- **Secrets:** move off `.env` to a secrets manager (Vault, AWS Secrets Manager) once there's more than one deployer.
 
 #### 3. **Input Validation**
 - Pydantic models validate all REST payloads.
@@ -771,11 +803,16 @@ Currently: **none** (demo). For production:
 **Upside:** Sub-second contradiction alerts; works without keys.
 **Downside:** Subtle contradictions might be missed (e.g., "I'll try to …" vs "I'll definitely…").
 
-### Self-hosted (Postgres) vs. SaaS (Managed Cognee)
+### Self-hosted local stores vs. SaaS (Managed Cognee)
 **Trade-off:** Self-hosted is control + cost savings but ops burden; SaaS is hands-off but vendor lock-in + cost per API call.
-**Our choice:** Postgres self-hosted (best for hackathon "Best Use of Open Source" track).
-**Upside:** No ongoing charges; full control; auditable.
-**Downside:** Must manage backups, upgrades, scaling.
+**Our choice:** Cognee's default local stores — SQLite (relational) + LanceDB
+(vector), with local `fastembed` embeddings, so nothing external needs
+provisioning (good fit for the "Best Use of Open Source" track). This is the
+actual default, not a Postgres install we set up ourselves.
+**Upside:** Zero infrastructure to run; works offline except for the Groq calls.
+**Downside:** Doesn't horizontally scale past one box as-is; a real
+multi-instance deployment would need to swap in a shared store (see
+[Scalability](#scalability)).
 
 ### Real-time Alerts vs. Batch Processing
 **Trade-off:** Real-time is immediacy but resource-intensive; batch is cheap but delays feedback.
@@ -795,11 +832,11 @@ Currently: **none** (demo). For production:
 
 ### Tier 1: MVP (Week 1) — ✅ **DONE**
 **Scope:** Proof of concept.
-- [ ] FastAPI server with `/api/utterance`, `/api/state`, `/ws`.
-- [ ] Groq fact extraction (heuristic fallback).
-- [ ] Cognee `remember` + `recall` (basic).
-- [ ] Vanilla JS UI (transcripts, facts, Q&A).
-- [ ] Demo script.
+- [x] FastAPI server with `/api/utterance`, `/api/state`, `/ws`.
+- [x] Groq fact extraction (heuristic fallback).
+- [x] Cognee `remember` + `recall` (basic).
+- [x] Vanilla JS UI (transcripts, facts, Q&A) — since replaced by the React/R3F frontend in Tier 2.
+- [x] Demo script.
 - **Timeline:** 3–4 days.
 - **Team:** 1 person (full-stack).
 - **Status:** ✅ Complete (July 1).
@@ -941,34 +978,33 @@ docker-compose up -d
 
 ---
 
-## Why This Will Win
+## What's distinct about this submission
 
-### Hackathon Judges' Scorecard
+No self-scoring here — that's for judges to decide. The points worth making
+on their own merits:
 
-| Criterion | Continuum | Score |
-|-----------|-----------|-------|
-| **Potential Impact** | Temporal memory is a missing layer for AI agents. Applies to 10+ industries. | 9.5/10 |
-| **Creativity & Innovation** | No other team uses Cognee's temporal cognification + real-time contradiction detection as the hero feature. 3D R3F graph is a differentiator. | 9.8/10 |
-| **Technical Excellence** | Clean async architecture, heuristic fallbacks, defensive code (no keys required), ported to React/R3F mid-hackathon. | 9.2/10 |
-| **Best Use of Cognee** | Wires all four ops (remember/recall/improve/forget) as core mechanics. Temporal cognify is the moat. Hybrid graph+vector. | 9.9/10 |
-| **User Experience** | Animated landing, real-time studio, 3D graph, clear feedback. Zero-config demo. | 9.4/10 |
-| **Presentation Quality** | 3-min demo (demo script triggers contradiction live), README, blog post, social posts, GitHub repo. | 9.3/10 |
-| **TOTAL** | | **56.8/60** (~94%) |
+1. **All four Cognee operations are load-bearing, not decorative.**
+   `remember`/`recall`/`improve`/`forget` each map to a real user-facing
+   action (ingest, Ask box, end-call learning, off-the-record redaction), and
+   the UI flashes an indicator every time one actually fires
+   (`_flash_op` in [pipeline.py](backend/app/pipeline.py)) — so the mapping
+   is verifiable while watching the app run, not just asserted in this doc.
+2. **Temporal cognification is the actual mechanism**, not a buzzword —
+   `memory.py` explicitly tries `cognify(temporal_cognify=True)` first and
+   only falls back to plain `cognify()` if that signature isn't supported by
+   the installed Cognee version.
+3. **The contradiction detector runs on the live path**, not as a batch job
+   after the call ends — see [The ingest pipeline](#the-ingest-pipeline-step-by-step).
+4. **Zero-config demo.** No Groq key or Cognee install is required to see
+   the core loop work end to end, verified in heuristic mode.
+5. **The 3D graph is functional, not just decorative** — node color encodes
+   the same fact taxonomy the extractor uses, and contradiction edges are
+   the one visual cue that means "look here."
 
-### Why Judges Will Choose Continuum
-
-1. **Moat:** Temporal cognification + contradiction radar = no one else is doing this.
-2. **Execution:** Full-stack, from landing page to 3D graph, in under a week. Shows speed + quality.
-3. **Leverage:** Uses *all four Cognee operations* — memory/recall/improve/forget are not afterthoughts; they're baked in.
-4. **Demo moment:** "⚠️ Contradiction detected: budget changed from $40k to $55k" is a jaw-drop.
-5. **Zero-config:** Works without Groq key or Cognee install. Judges can play immediately.
-6. **Extensibility:** Easy to add real STT, multi-party, custom contradictions, industry verticals.
-7. **Narrative:** "AI agents wake up with no memory" is relatable; "Continuum solves this" is compelling.
-
-### Side-Track Wins
-- **Best Blogs:** "Building a real-time temporal memory layer with Cognee" + temporal-cognify deep dive = Keychron keyboard.
-- **Social Buzz:** Daily posts of the demo clip + graph animations = top 10 swag.
-- **Open-Source PRs:** 2–3 genuine Cognee repo PRs (docs, examples, bug fixes) = $100–300 + goodwill.
+What we'd want a judge to actually try, in order: play the scripted demo,
+watch the $40k→$55k contradiction get flagged live, click "off the record"
+and watch a node vanish from the graph, then ask the Ask box "what did each
+side commit to?"
 
 ---
 
@@ -1042,7 +1078,10 @@ Continuum + Groq + Cognee solves all of these.
 For true offline, use only heuristics (degraded memory quality).
 
 ### Q: Can I export my memory?
-**A:** Yes. The archive has a JSON export:
+**A:** There's no dedicated export button in the UI today, but every ended
+session is already in the snapshot returned by `GET /api/state` (and its
+`archive` field specifically), so `curl http://localhost:8000/api/state` gets
+you the same JSON a future export button would produce:
 ```json
 {
   "session_id": "call_1719864000",
@@ -1054,12 +1093,13 @@ For true offline, use only heuristics (degraded memory quality).
 }
 ```
 
-CSV export planned (list of commitments, decisions, timeline).
+A dedicated export button (and CSV output) is a small, reasonable follow-up.
 
 ### Q: Is my data private?
 **A:** Yes (self-hosted):
-- Everything runs on your Postgres instance.
-- Groq API sees only the utterance text (no metadata).
+- Everything runs on your machine — Cognee's local SQLite + LanceDB stores,
+  no external database to provision or trust.
+- Groq API sees only the utterance text per call (no metadata attached).
 - Embeddings are computed locally (fastembed).
 - No cloud syncing by default.
 
@@ -1095,16 +1135,19 @@ For Groq-based custom logic, modify the `_JUDGE_SYS` prompt.
 For now, use the REST API to build custom integrations:
 ```bash
 curl -X POST http://localhost:8000/api/utterance \
+  -H "Content-Type: application/json" \
   -d '{"speaker": "Alice", "text": "…"}'
 ```
 
 ### Q: What's the cost to run this?
-**A:** Self-hosted: **free** (Groq free tier + open-source stack).
-- Groq: ~$3–5/month if you exceed free tier (100K tokens/month).
-- Postgres: $0 (your server).
-- Other libraries: $0 (open-source).
+**A:** Self-hosted, everything except the LLM call is free:
+- Groq: has a free tier; check [console.groq.com](https://console.groq.com)
+  for current limits/pricing — don't take a number here as current, Groq's
+  terms change.
+- Cognee's local stores (SQLite + LanceDB): $0, no server to run.
+- Everything else in the stack: $0 (open-source).
 
-For managed Cognee Cloud (future): pricing TBD.
+For managed Cognee Cloud (a hosted alternative to the local stores): pricing TBD, not something we've evaluated.
 
 ### Q: How many languages does Continuum support?
 **A:** Primarily English (trained data for Groq, heuristics).
@@ -1179,8 +1222,9 @@ For other languages:
    - Should extract to a version adapter class.
 
 2. **Graph Visualization**
-   - 3D graph is heavy (~1.3 MB).
-   - Should code-split or lazy-load R3F.
+   - The R3F/Three.js dependency makes up most of the ~1.28 MB build.
+   - Should code-split or lazy-load it so the landing page doesn't pay for
+     the Studio's 3D graph.
 
 3. **Error Handling**
    - Groq/Cognee failures are silent (logged, but no user-facing retry).
@@ -1188,11 +1232,14 @@ For other languages:
 
 4. **Deployment**
    - No Docker Compose yet.
-   - Should have one (Postgres + Redis + FastAPI + Vite build).
+   - Should have one (FastAPI + Vite build; Cognee's local SQLite/LanceDB
+     stores don't need their own container, so this is simpler than it
+     sounds — no Postgres/Redis to orchestrate unless we later swap to the
+     multi-box architecture in [Scalability](#scalability)).
 
 ### Advice for Future Builders
 
-1. **Start with the demo.** Build the scripted scenario first (the 10-utterance negotiation). Everything else serves that demo.
+1. **Start with the demo.** Build the scripted scenario first (the 11-line negotiation in `demo_script.py`). Everything else serves that demo.
 
 2. **Hybrid is your friend.** Groq + heuristics, graph + vector, real-time + batch. Don't choose one.
 

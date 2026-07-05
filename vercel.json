@@ -1,9 +1,0 @@
-{
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/dist",
-  "env": {
-    "VITE_API_URL": {
-      "default": "http://localhost:8000"
-    }
-  }
-}

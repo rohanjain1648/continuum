@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Continuum — Pitch Deck</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  :root{
+    --bg:#05060f; --surface:#0c0e1c; --surface-2:#10132322; --ink:#e8eaf5; --ink-dim:#9aa0c0; --ink-faint:#666c8f;
+    --rule:#23273f; --rule-strong:#343a5c;
+    --violet:#9c85ff; --cyan:#48d8ee; --green:#4fe3ad; --blue:#7fb0ff; --amber:#fbbf24; --coral:#fb7185;
+    --violet-bg:#9c85ff22; --cyan-bg:#48d8ee1c; --green-bg:#4fe3ad1c; --blue-bg:#7fb0ff1c; --amber-bg:#fbbf241c; --coral-bg:#fb71851f;
+    --serif: "Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --mono: ui-monospace,"Cascadia Code","JetBrains Mono","SF Mono",Menlo,Consolas,monospace;
+    --page-w: 210mm; --page-h: 297mm;
+  }
+  *{box-sizing:border-box;}
+  html,body{ margin:0; background:#02030a; color:var(--ink); font-family:var(--serif); -webkit-font-smoothing:antialiased; }
+  ::selection{ background:var(--violet-bg); color:var(--ink); }
+
+  /* ---------------- on-screen chrome (hidden when printing) ---------------- */
+  .toolbar{
+    position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:center; gap:14px;
+    padding:14px 18px; background:#0a0c17ee; backdrop-filter:blur(6px); border-bottom:1px solid var(--rule);
+    font-family:var(--mono); font-size:0.82rem; color:var(--ink-dim);
+  }
+  .toolbar b{ color:var(--ink); }
+  .toolbar button{
+    font-family:var(--mono); font-size:0.8rem; color:#05060f; background:var(--violet); border:none;
+    padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600; letter-spacing:0.02em;
+  }
+  .toolbar button:hover{ filter:brightness(1.08); }
+  .toolbar button:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
+
+  .deck{ display:flex; flex-direction:column; align-items:center; gap:34px; padding:40px 16px 80px; }
+
+  /* ---------------- the slide (fixed, physical page size) ---------------- */
+  .slide{
+    width:var(--page-w); height:var(--page-h); flex:none; position:relative; overflow:hidden;
+    background:
+      radial-gradient(1100px 500px at 82% -10%, #7c5cff14, transparent 60%),
+      radial-gradient(900px 480px at -10% 108%, #22d3ee12, transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    padding:16mm 17mm 14mm;
+    display:flex; flex-direction:column;
+    box-shadow:0 30px 70px -30px #000000cc, 0 0 0 1px var(--rule);
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .slide::before{ /* faint corner mark, brand continuity with the app's cosmic bg */
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background-image: radial-gradient(1px 1px at 12% 20%, #ffffff22 50%, transparent 51%),
+                       radial-gradient(1px 1px at 78% 64%, #ffffff1a 50%, transparent 51%),
+                       radial-gradient(1.4px 1.4px at 40% 82%, #ffffff22 50%, transparent 51%),
+                       radial-gradient(1px 1px at 90% 15%, #ffffff18 50%, transparent 51%);
+  }
+
+  .eyebrow{
+    font-family:var(--mono); font-size:9.5pt; letter-spacing:0.16em; text-transform:uppercase;
+    color:var(--ink-faint); display:flex; align-items:center; gap:10px; margin-bottom:auto;
+  }
+  .eyebrow .n{ color:var(--violet); }
+  .eyebrow::after{ content:""; flex:1; height:1px; background:var(--rule); }
+
+  .slide h1{
+    font-family:var(--serif); font-weight:600; font-size:30pt; line-height:1.08; letter-spacing:-0.01em;
+    margin:14px 0 6px; text-wrap:balance; color:var(--ink);
+  }
+  .slide h2{
+    font-family:var(--serif); font-weight:600; font-size:19pt; line-height:1.15; letter-spacing:-0.005em;
+    margin:10px 0 14px; text-wrap:balance; color:var(--ink);
+  }
+  .dek{ font-family:var(--serif); font-style:italic; font-size:12.5pt; color:var(--ink-dim); max-width:62ch; margin:0 0 6mm; }
+  .body-text{ font-size:11.3pt; line-height:1.62; color:var(--ink-dim); max-width:66ch; }
+  .body-text b{ color:var(--ink); font-weight:600; }
+  .body-text code{ font-family:var(--mono); font-size:0.88em; color:var(--cyan); }
+
+  .foot{
+    margin-top:auto; padding-top:6mm; border-top:1px solid var(--rule);
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-family:var(--mono); font-size:8.3pt; color:var(--ink-faint); letter-spacing:0.03em;
+  }
+  .foot .mark{ display:flex; align-items:center; gap:7px; }
+  .foot .mark i{ width:6px; height:6px; border-radius:50%; background:var(--violet); display:inline-block; }
+
+  /* ---------------- shared content components ---------------- */
+  .stack-chips{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10mm; }
+  .stack-chips span{
+    font-family:var(--mono); font-size:9pt; color:var(--ink-dim); border:1px solid var(--rule-strong);
+    border-radius:999px; padding:4px 12px;
+  }
+
+  .ledger{ border:1px solid var(--rule); border-radius:8px; background:var(--surface); margin:4mm 0; }
+  .ledger-head{
+    display:flex; justify-content:space-between; padding:8px 14px; border-bottom:1px solid var(--rule);
+    font-family:var(--mono); font-size:8pt; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-faint);
+  }
+  .line{
+    display:grid; grid-template-columns:26px 78px 1fr; gap:10px; padding:7px 14px;
+    font-family:var(--mono); font-size:9pt; line-height:1.5; border-bottom:1px dashed var(--rule);
+  }
+  .line:last-child{ border-bottom:none; }
+  .line .t{ color:var(--ink-faint); }
+  .line .who{ color:var(--violet); font-weight:600; }
+  .line .txt{ color:var(--ink-dim); }
+  .line.flag{ background:var(--coral-bg); }
+  .line.flag .who{ color:var(--coral); }
+  .line.flag .txt{ color:var(--ink); }
+  .flag-tag{
+    display:inline-block; font-family:var(--mono); font-size:7pt; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--coral); border:1px solid var(--coral); border-radius:999px; padding:1px 7px; margin-left:6px;
+  }
+  .connector{ padding:6px 14px 10px 114px; font-family:var(--mono); font-size:8.3pt; color:var(--coral); }
+  .connector::before{ content:"⤷ "; }
+
+  .diagram{ border:1px solid var(--rule); border-radius:8px; background:var(--surface); padding:14px; margin:5mm 0; }
+  .dg-row{ display:flex; gap:8px; align-items:stretch; }
+  .dg-col{ display:flex; flex-direction:column; gap:8px; flex:1; justify-content:center; }
+  .dg-box{
+    border:1px solid var(--rule-strong); border-radius:7px; padding:8px 10px; background:var(--bg);
+    font-family:var(--mono); font-size:7.6pt; color:var(--ink-dim); line-height:1.4;
+  }
+  .dg-box b{ display:block; color:var(--ink); font-size:9pt; margin-bottom:2px; font-family:var(--serif); font-weight:600; }
+  .dg-box.violet{ border-color:var(--violet); background:var(--violet-bg); }
+  .dg-box.cyan{ border-color:var(--cyan); background:var(--cyan-bg); }
+  .dg-box.green{ border-color:var(--green); background:var(--green-bg); }
+  .dg-box.blue{ border-color:var(--blue); background:var(--blue-bg); }
+  .dg-box.amber{ border-color:var(--amber); background:var(--amber-bg); }
+  .dg-box.coral{ border-color:var(--coral); background:var(--coral-bg); }
+  .dg-arrow{ display:flex; align-items:center; justify-content:center; color:var(--ink-faint); font-size:13pt; min-width:12px; }
+  .dg-note{ font-family:var(--mono); font-size:7.5pt; color:var(--ink-faint); margin-top:10px; }
+
+  .verbs{ display:grid; grid-template-columns:1fr 1fr; gap:9px; margin:5mm 0; }
+  .verb{ border:1px solid var(--rule); border-radius:8px; padding:11px 13px; background:var(--surface); border-top:3px solid var(--c); }
+  .verb h3{ margin:0 0 4px; font-size:11.5pt; font-family:var(--serif); display:flex; align-items:center; gap:8px; }
+  .verb .dot{ width:7px; height:7px; border-radius:50%; background:var(--c); flex:none; }
+  .verb .fn{ font-family:var(--mono); font-size:7.6pt; color:var(--ink-faint); margin-bottom:6px; }
+  .verb p{ font-size:9pt; color:var(--ink-dim); margin:0; line-height:1.5; }
+  .verb.v1{ --c:var(--violet); } .verb.v2{ --c:var(--cyan); } .verb.v3{ --c:var(--green); } .verb.v4{ --c:var(--coral); }
+
+  .legend{ display:flex; flex-wrap:wrap; gap:8px 16px; margin:4mm 0 2mm; font-family:var(--mono); font-size:8.5pt; }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; color:var(--ink-dim); }
+  .legend i{ width:8px; height:8px; border-radius:50%; display:inline-block; background:var(--c); }
+  .legend .l1{--c:var(--violet)} .legend .l2{--c:var(--cyan)} .legend .l3{--c:var(--green)}
+  .legend .l4{--c:var(--blue)} .legend .l5{--c:var(--amber)} .legend .l6{--c:var(--coral)}
+
+  .stats{ display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden; margin:5mm 0; }
+  .stat{ flex:1; padding:11px 10px; text-align:center; background:var(--surface); }
+  .stat + .stat{ border-left:1px solid var(--rule); }
+  .stat .n{ font-family:var(--mono); font-size:10.5pt; color:var(--ink); }
+  .stat .l{ font-family:var(--mono); font-size:7pt; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-faint); margin-top:3px; }
+
+  .kv{ display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:5mm 0; font-size:10pt; }
+  .kv dt{ font-family:var(--mono); font-size:8.5pt; color:var(--violet); white-space:nowrap; padding-top:2px; }
+  .kv dd{ margin:0; color:var(--ink-dim); line-height:1.55; }
+  .kv dd code{ font-family:var(--mono); font-size:0.86em; color:var(--cyan); }
+
+  ul.tick, ul.plain{ margin:4mm 0; padding:0; list-style:none; }
+  ul.tick li{ position:relative; padding-left:20px; margin-bottom:8px; font-size:10.6pt; color:var(--ink-dim); line-height:1.5; }
+  ul.tick li::before{ content:"→"; position:absolute; left:0; color:var(--violet); }
+  ul.plain li{ margin-bottom:7px; font-size:10.3pt; color:var(--ink-dim); line-height:1.5; }
+
+  .cover-title{ font-size:52pt; font-weight:600; letter-spacing:-0.015em; margin:0 0 8px; line-height:1; }
+  .cover-mark{ font-family:var(--mono); font-size:9.5pt; letter-spacing:0.18em; text-transform:uppercase; color:var(--ink-faint); }
+  .cover-center{ display:flex; flex-direction:column; align-items:flex-start; justify-content:center; flex:1; }
+  .bignum{ font-family:var(--serif); font-size:120pt; line-height:0.8; color:var(--rule-strong); position:absolute; right:14mm; top:14mm; font-weight:600; -webkit-text-stroke:1px var(--rule-strong); color:transparent; }
+
+  .two-col{ display:flex; gap:14px; }
+  .two-col > div{ flex:1; }
+
+  /* ---------------- print ---------------- */
+  @media print{
+    .toolbar{ display:none !important; }
+    html,body{ background:#fff; }
+    .deck{ padding:0; gap:0; }
+    .slide{ box-shadow:none; page-break-after:always; break-after:page; margin:0; }
+    .slide:last-child{ page-break-after:auto; break-after:auto; }
+    @page{ size:210mm 297mm; margin:0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar no-print">
+  <span>Continuum — Pitch Deck · <b>12 pages</b> · A4 portrait</span>
+  <button onclick="window.print()">⬇ Save as PDF</button>
+  <span>Print dialog → enable “Background graphics” for full color</span>
+</div>
+
+<div class="deck">
+
+  <!-- 1 — COVER -->
+  <section class="slide">
+    <div class="bignum">01</div>
+    <div class="eyebrow"><span class="n">WeMakeDevs × Cognee</span> — The Hangover Part AI</div>
+    <div class="cover-center">
+      <div class="cover-mark">real-time temporal memory</div>
+      <h1 class="cover-title">Continuum</h1>
+      <p class="dek">Catches the contradiction before the follow-up email does.</p>
+      <div class="stack-chips">
+        <span>Cognee</span><span>Groq</span><span>FastAPI</span><span>React Three Fiber</span>
+      </div>
+    </div>
+    <div class="foot">
+      <span class="mark"><i></i>Continuum</span>
+      <span>Jun 29 – Jul 5, 2026 · 01 / 12</span>
+    </div>
+  </section>
+
+  <!-- 2 — THE PROBLEM -->
+  <section class="slide">
+    <div class="eyebrow"><span class="n">01</span>The problem</div>
+    <h2>Human memory drifts mid-conversation — nobody lies on purpose.</h2>
+    <p class="body-text">
+      A budget stated <b>“firm at $40,000”</b> becomes <b>“$55,000”</b> nine lines later,
+      mid-negotiation, while everyone's thinking about something else. That's not a villain —
+      it's how working memory fails under load.
+    </p>
+    <p class="body-text">
+      A raw transcript doesn't fix this — you'd have to re-read the whole thing to catch the
+      drift. A summary is worse: it flattens the exact tension you needed to see.
+    </p>
+    <p class="body-text">
+      The cost compounds silently until it surfaces as an awkward <i>“wait, that's not what we
+      agreed”</i> email — days later, once it's expensive to unwind.
+    </p>
+    <div class="foot"><span class="mark"><i></i>Continuum</span><span>02 / 12</span></div>
+  </section>
+
+  <!-- 3 — THE INSIGHT -->
+  <section class="slide">
+    <div class="eyebrow"><span class="n">02</span>The insight</div>
+    <h2>Four verbs, not one feature.</h2>
+    <p class="body-text">
+      What's missing is something closer to a sharp chief of staff sitting in on the call:
+      remembers every number anyone has said, notices the instant a new one doesn't match, and —
+      because not everything said in a room should live forever — can be told to strike a line
+      from the record.
+    </p>
+    <div class="verbs">
+      <div class="verb v1"><h3><span class="dot"></span>remember</h3><p>Every utterance, ingested the instant it's spoken.</p></div>
+      <div class="verb v2"><h3><span class="dot"></span>recall</h3><p>Auto-routed retrieval across the graph.</p></div>
+      <div class="verb v3"><h3><span class="dot"></span>improve</h3><p>Temporal cognify — the graph gets richer over time.</p></div>
+      <div class="verb v4"><h3><span class="dot"></span>forget</h3><p>Surgical, on command — “off the record.”</p></div>
+    </div>
+    <p class="body-text">
+      Cognee's API — <code>add</code> / <code>search</code> / <code>cognify</code> / <code>prune</code> —
+      is already organized around exactly these four verbs. The hard product question arrives
+      pre-answered; our job is wiring a live conversation into it fast enough to matter.
+    </p>
+    <div class="foot"><span class="mark"><i></i>Continuum</span><span>03 / 12</span></div>
+  </section>
+
+  <!-- 4 — WHAT CONTINUUM DOES -->
+  <section class="slide">
+    <div class="eyebrow"><span class="n">03</span>The product</div>
+    <h2>What Continuum does.</h2>
+    <p class="body-text">
+      Listens to a live conversation, builds a knowledge graph of it <b>as it's spoken</b>, flags
+      contradictions the instant they happen, and forgets on command.
+    </p>
+    <dl class="kv">
+      <dt>Inputs</dt><dd>🎙 mic (browser Web Speech API, no STT key) · typed transcript · a scripted demo negotiation</dd>
+      <dt>Landing <code>/</code></dt><dd>An animated explainer — sells the idea in five seconds, walks through the four operations.</dd>
+      <dt>Studio <code>/studio</code></dt><dd>The real-time cockpit — transcript, memory intelligence, and a live 3D knowledge graph, three columns wide.</dd>
+    </dl>
+    <p class="body-text">
+      Reasoning runs on <b>Groq</b>; durable memory is <b>Cognee</b> — hybrid graph + vector,
+      with temporal cognification as the actual mechanism, not a buzzword.
+    </p>
+    <div class="foot"><span class="mark"><i></i>Continuum</span><span>04 / 12</span></div>
+  </section>
+
+  <!-- 5 — LIVE DEMO: THE MOMENT -->
+  <section class="slide">
+    <div class="eyebrow"><span class="n">04</span>Live demo</div>
+    <h2>The moment the project is built around.</h2>
+    <div class="ledger">
+      <div class="ledger-head"><span>Acme × Northwind — vendor negotiation</span><span>t0–t9</span></div>
+      <div class="line"><span class="t">t0</span><span class="who">Maya</span><span class="txt">Our budget for this rollout is firm at forty thousand dollars for the year.</span></div>
+      <div class="line"><span class="t">t3</span><span class="who">Dev</span><span class="txt">I'll commit to sending you a full proposal by this Friday.</span></div>
+      <div class="line"><span class="t">t5</span><span class="who">Maya</span><span class="txt">We decided internally to go with the annual plan rather than monthly.</span></div>
+      <div class="line flag"><span class="t">t8</span><span class="who">Dev</span><span class="txt">Looking at the numbers, I think we could actually go up to fifty five thousand.<span class="flag-tag">⚠ contradicts t0</span></span></div>
+      <div class="line"><span class="t">t9</span><span class="who">Maya</span><span class="txt">Wait, fifty five? Earlier we said the budget was firm at forty.</span></div>
+    </div>
+    <div class="connector">value changed budget: “$40,000” → “$55,000” · confidence 0.8 · severity high</div>
+    <p class="body-text">Flagged instantly, mid-call — not in a post-call review three days later.</p>
+    <div class="foot"><span class="mark"><i></i>Continuum</span><span>05 / 12</span></div>
+  </section>
+
+  <!-- 6 — ARCHITECTURE -->
+  <section class="slide">
+    <div class="eyebrow"><span class="n">05</span>Architecture</div>
+    <h2>One orchestrator, five steps, never blocking.</h2>
+    <div class="diagram">
+      <div class="dg-row">
+        <div class="dg-col"><div class="dg-box"><b>Studio</b>Composer → POST /api/utterance</div></div>
+        <div class="dg-arrow">→</div>
+        <div class="dg-col"><div class="dg-box"><b>FastAPI</b>ContinuumEngine.ingest()</div></div>
+        <div class="dg-arrow">→</div>
+        <div class="dg-col">
+          <div class="dg-box violet"><b>remember()</b>cognee.add</div>
+          <div class="dg-box cyan"><b>extract_facts()</b>llama-3.1-8b-instant</div>
+          <div class="dg-box coral"><b>judge_contradiction()</b>llama-3.3-70b</div>
+        </div>
+        <div class="dg-arrow">→</div>
+        <div class="dg-col"><div class="dg-box blue"><b>broadcast()</b>WebSocket → every tab</div></div>
+      </div>
+      <div class="dg-note">continuum/backend/app/pipeline.py — ContinuumEngine.ingest()</div>
+    </div>
+    <p class="body-text">
+      The hot path never waits on the memory layer — the expensive graph build
+      (<code>cognify</code>) is batched in the background every 4 utterances. The contradiction
+      judge only runs when there's an actual prior fact to compare against.
+    </p>
+    <div class="foot"><span class="mark"><i></i>Continuum</span><span>06 / 12</span></div>
+  </section>
+
+  <!-- 7 — FOUR OPS, MADE VISIBLE -->
+  <section class="slide">
+    <div class="eyebrow"><span class="n">06</span>The four operations</div>
+    <h2>Made visible — not decorative.</h2>
+    <div class="verbs">
+      <div class="verb v1"><h3><span class="dot"></span>remember</h3><div class="fn">cognee.add(dataset="continuum")</div><p>Every utterance, timestamped and speaker-tagged.</p></div>
+      <div class="verb v2"><h3><span class="dot"></span>recall</h3><div class="fn">cognee.search(GRAPH_COMPLETION | TEMPORAL)</div><p>Powers the Ask box and contradiction lookups.</p></div>
+      <div class="verb v3"><h3><span class="dot"></span>improve</h3><div class="fn">cognee.cognify(temporal_cognify=True)</div><p>Batched every 4 utterances + at end-of-call.</p></div>
+      <div class="verb v4"><h3><span class="dot"></span>forget</h3><div class="fn">cognee.prune.prune_data()</div><p>Wired to “off the record” — redacts both layers.</p></div>
+    </div>
+    <p class="body-text">
+      Every call into <code>CogneeMemory</code> flashes a status chip in the cockpit
+      (<code>_flash_op</code>) — the four verbs Cognee exposes are a status light the user
+      watches light up live, not an implementation detail buried in the backend.
+    </p>
+    <div class="foot"><span class="mark"><i></i>Continuum</span><span>07 / 12</span></div>
+  </section>
+
+  <!-- 8 — TWO MODELS, TWO SPEEDS -->
+  <section class="slide">
+    <div class="eyebrow"><span class="n">07</span>Groq: two models, two speeds</div>
+    <h2>Fast enough to never fall behind the speaker.</h2>
+    <div class="verbs">
+      <div class="verb v2">
+        <h3><span class="dot"></span>llama-3.1-8b-instant</h3>
+        <div class="fn">extract_facts(speaker, text)</div>
+        <p>Runs on every utterance. Pulls 0–3 structured facts — commitment, decision, number,
+        risk — each with a canonical subject. Must return well under a second.</p>
+      </div>
+      <div class="verb v4">
+        <h3><span class="dot"></span>llama-3.3-70b-versatile</h3>
+        <div class="fn">judge_contradiction() · answer_question()</div>
+        <p>Only runs when there's real reasoning to do — comparing a new fact against every
+        prior fact on the same subject, or answering an open question.</p>
+      </div>
+    </div>
+    <p class="body-text">
+      Both calls use Groq's JSON mode, with a regex-rescue fallback if a response isn't clean
+      JSON — the difference between a demo that silently recovers and one that crashes on stage.
+    </p>
+    <div class="foot"><span class="mark"><i></i>Continuum</span><span>08 / 12</span></div>
+  </section>
+
+  <!-- 9 — 3D GRAPH -->
+  <section class="slide">
+    <div class="eyebrow"><span class="n">08</span>The knowledge graph</div>
+    <h2>A graph you can walk into.</h2>
+    <p class="body-text">
+      Every time the fact ledger changes, a small typed graph — speakers, subjects, facts,
+      contradiction edges — is rebuilt. <code>d3-force-3d</code> runs a headless simulation
+      (300 ticks); React Three Fiber renders the result as glowing, orbit-able spheres.
+    </p>
+    <div class="legend">
+      <span class="l1"><i></i>speaker</span><span class="l2"><i></i>subject</span>
+      <span class="l3"><i></i>commitment</span><span class="l4"><i></i>decision</span>
+      <span class="l5"><i></i>number</span><span class="l6"><i></i>contradiction</span>
+    </div>
+    <p class="body-text">
+      Color is functional, not decorative — it's the same taxonomy the fact extractor uses. When
+      two facts contradict, both nodes get a coral halo and the edge renders dashed — the one
+      visual cue in the whole cockpit that means <i>stop and look here.</i>
+    </p>
+    <div class="foot"><span class="mark"><i></i>Continuum</span><span>09 / 12</span></div>
+  </section>
+
+  <!-- 10 — RELIABILITY -->
+  <section class="slide">
+    <div class="eyebrow"><span class="n">09</span>Reliability</div>
+    <h2>Never let the demo die.</h2>
+    <p class="body-text">
+      A hackathon room has bad wifi, expiring keys, and installs that don't finish in time. Every
+      layer of Continuum has a floor it can't fall through.
+    </p>
+    <div class="stats">
+      <div class="stat"><div class="n">no key</div><div class="l">regex + spoken-number extractor</div></div>
+      <div class="stat"><div class="n">no cognee</div><div class="l">status → “degraded,” loop keeps running</div></div>
+      <div class="stat"><div class="n">bad json</div><div class="l">regex-rescued from the raw response</div></div>
+    </div>
+    <p class="body-text">
+      Without <code>GROQ_API_KEY</code>, extraction falls back to hand-tuned regexes — including a
+      spoken-number parser that turns <i>“fifty five thousand”</i> into <code>55000.0</code> with
+      no LLM at all. The headline feature — live contradiction detection — never depends on
+      either Groq or Cognee being present.
+    </p>
+    <div class="foot"><span class="mark"><i></i>Continuum</span><span>10 / 12</span></div>
+  </section>
+
+  <!-- 11 — WHAT'S NEXT -->
+  <section class="slide">
+    <div class="eyebrow"><span class="n">10</span>What's next</div>
+    <h2>The honest list, not the sales pitch.</h2>
+    <ul class="tick">
+      <li><b>Cross-session recall, surfaced.</b> Every ended call is already archived with a summary — the UI to query a specific past session isn't built yet.</li>
+      <li><b>Temporal cognify at real scale.</b> Proven on one scripted negotiation; the interesting failures only show up after a week of real calls.</li>
+      <li><b>Real speaker diarization.</b> The mic path transcribes but doesn't yet distinguish speakers automatically.</li>
+      <li><b>Multi-party awareness.</b> Track position and consensus across more than two speakers.</li>
+    </ul>
+    <p class="body-text">
+      And what isn't built: auth, multi-instance WebSocket fan-out. None of it blocks the core
+      loop — remember / recall / improve / forget and live contradiction detection are fully
+      wired end to end, including with no external keys at all.
+    </p>
+    <div class="foot"><span class="mark"><i></i>Continuum</span><span>11 / 12</span></div>
+  </section>
+
+  <!-- 12 — CLOSING -->
+  <section class="slide">
+    <div class="eyebrow"><span class="n">11</span>Closing</div>
+    <div class="cover-center">
+      <h2 style="font-size:24pt;">It catches the drift, live —<br/>before the awkward follow-up email.</h2>
+      <p class="body-text" style="max-width:56ch;">That was the bar. It cleared it.</p>
+      <dl class="kv" style="margin-top:10mm;">
+        <dt>Code</dt><dd>Public repository, MIT-licensed.</dd>
+        <dt>Built for</dt><dd>WeMakeDevs × Cognee — “The Hangover Part AI: Where's My Context?”</dd>
+        <dt>Stack</dt><dd>Cognee · Groq · FastAPI · React Three Fiber</dd>
+      </dl>
+    </div>
+    <div class="foot"><span class="mark"><i></i>Continuum</span><span>Thank you · 12 / 12</span></div>
+  </section>
+
+</div>
+
+</body>
+</html>

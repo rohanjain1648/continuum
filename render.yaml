@@ -1,0 +1,52 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# One service, Docker-built: the Dockerfile compiles the Vite frontend and
+# bundles it into the FastAPI image, which serves both the API/WebSocket and
+# the built UI from a single origin (main.py's SPA fallback). No separate
+# frontend deployment needed.
+#
+# Deploy: Render dashboard → New → Blueprint → point at this repo. Render
+# reads this file and provisions the service; you'll still need to fill in
+# the `sync: false` secrets below in the dashboard afterward.
+
+services:
+  - type: web
+    name: continuum
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      # ---- Groq (required for full-quality extraction/reasoning) ----
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: GROQ_FAST_MODEL
+        value: llama-3.1-8b-instant
+
+      # ---- Cognee memory layer ----
+      - key: USE_COGNEE
+        value: "true"
+      - key: COGNEE_DATASET
+        value: continuum
+      - key: COGNIFY_EVERY
+        value: "4"
+
+      # ---- Cognee Cloud (recommended on Render) ----
+      # Render's free/standard web services have an EPHEMERAL filesystem —
+      # it resets on every redeploy. Cognee's local default (SQLite +
+      # LanceDB) would lose memory on each deploy as a result. Point at a
+      # Cognee Cloud tenant instead (https://platform.cognee.ai/onboarding)
+      # and memory persists independently of the container's disk. Leave
+      # both blank to fall back to the local store (fine for a quick demo,
+      # not for anything you want to survive a redeploy).
+      - key: COGNEE_API_KEY
+        sync: false
+      - key: COGNEE_BASE_URL
+        sync: false
+
+      - key: HOST
+        value: "0.0.0.0"
+      # PORT is injected by Render automatically — do not set it here.

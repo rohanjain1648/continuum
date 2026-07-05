@@ -19,9 +19,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 log = logging.getLogger("continuum")
 
 app = FastAPI(title="Continuum", version="0.1.0")
+# Render (and any single-service deploy) serves the built frontend from the
+# same origin as the API, so production doesn't need CORS at all — these are
+# just the local dev origins (Vite's :5173 hot-reload server talking to the
+# backend on :8000).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:8000", "https://*.vercel.app"],
+    allow_origins=["http://localhost:5173", "http://localhost:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

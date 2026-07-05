@@ -1,5 +1,12 @@
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
+
+# pydantic-settings below only populates the fields this class declares.
+# Cognee reads its own config (COGNEE_API_KEY, COGNEE_BASE_URL, etc.) straight
+# from os.environ, so .env has to actually be loaded into the process
+# environment too, not just parsed into this Settings object.
+load_dotenv()
 
 
 class Settings(BaseSettings):
